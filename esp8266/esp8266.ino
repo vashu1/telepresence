@@ -126,14 +126,13 @@ void connectAWS()
 }
 
 
-void publishMessage()
-{
-  StaticJsonDocument<200> doc;
-  doc["time"] = millis();
-  char jsonBuffer[512];
-  serializeJson(doc, jsonBuffer); // print to client
-
-  client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
+void onRecieveI2C(int len) {
+    DynamicJsonDocument doc(JSON_MAX_SIZE);
+    deserializeJson(doc, Wire);
+    //doc["time"] = millis();
+    char jsonBuffer[JSON_MAX_SIZE];
+    serializeJson(doc, jsonBuffer);
+    client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
 }
 
 
@@ -142,6 +141,7 @@ void setup()
   Serial.begin(115200);
   //Wire.begin(D1, D2);
   Wire.begin(I2C_ESP8266_ADDRESS);
+  Wire.onReceive(onRecieveI2C);
   connectAWS();
 }
 

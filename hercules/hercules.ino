@@ -5,6 +5,12 @@
 #include <ArduinoJson.h> // https://arduinojson.org/
 #include "common.h"
 
+#define VOLTMETER_PIN A2
+#define AMMEMETER_PIN A3
+# check your ACS712 docs - 5A 185 mV/A, 20A 100 mV/A, 30A 100 mV/A
+#define AMMEMETER_CALIBRATION_COEFF 0.1
+
+unsigned long lastPongMillis = 0;
 unsigned long lastCmdTime;
 int leftSpeed, rightSpeed;
 
@@ -14,15 +20,27 @@ int getCmdCode(const char* cmd) {
   return -1;
 }
 
-/*
+float getVoltage() {
+  int sensorValue = analogRead(VOLTMETER_PIN);
+  float voltage = sensorValue * (5.0 / 1023.0);
+  return voltage;
+}
+
+float getCurrent() {
+  int sensorValue = analogRead(AMMEMETER_PIN);
+  //2.5 is offset(I assumed that arduino is working on 5v so the viout at no current comes
+  //0.185v(185mV) is rise in output voltage when 1A current flows at input
+  return (2.5 - (sensorValue * (5.0 / 1023.0)) ) / AMMEMETER_CALIBRATION_COEFF;
+}
+
+
 void sendToI2C(int ilen, unsigned char *idata) {
     //TODO assert(ilen < JSON_MAX_SIZE);
     Wire.beginTransmission(I2C_ESP8266_ADDRESS);
     for(int i = 0; i<ilen; i++) {Wire.write(idata[i]);}  // sends one byte
     Wire.endTransmission();                              // stop transmitting
-    
 }
-*/
+
 
 void onRecieveI2C(int len) {
     lastCmdTime = millis();
@@ -81,6 +99,21 @@ void setup() {
 }
 
 void loop() {
+    if (millis() - lastPongMillis > 1000) {
+      Serial.println("pong");
+      float voltage = getVoltage();
+      float current = getCurrent();
+      lastPongMillis = millis();
+      DynamicJsonDocument doc(1024);
+      doc["voltage"] = voltage;
+      doc["current"] = current;
+      Wire.beginTransmission(I2C_ESP8266_ADDRESS);
+        //Wire.write(doc.c_str());
+        serializeJson(doc, Wire);
+      Wire.endTransmission(); 
+      //sendToI2C(int ilen, unsigned char *idata);
+    }
+  
     Serial.println("loop");
     Serial.println(leftSpeed);
     // emergency stop if connection lost
