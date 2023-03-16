@@ -1,26 +1,37 @@
 /*********
   Rui Santos
-  Complete project details at https://randomnerdtutorials.com  
+  Complete project details at https://randomnerdtutorials.com
 *********/
+// board - NodeMCU 1.0    serial 115200
+// note to myself - use left USB port, reconnect usb on error
+// https://github.com/esp8266/Arduino/issues/1330
+// the issue is mentioned about support for I2C slave mode in esp8266.
+
+// pinouts https://esp8266-shop.com/esp8266-guide/esp8266-nodemcu-pinout/  https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
+
+// AWS IoT - based on https://how2electronics.com/connecting-esp8266-to-amazon-aws-iot-core-using-mqtt/
+
+// another IoT example https://medium.com/accenture-the-dock/esp8266-aws-iot-core-guide-c640f2622a51
+// checkout esphome.io
 
 // Load Wi-Fi library
 #include <ESP8266WiFi.h>
 
 #include <WiFiClientSecure.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
+// NodeMCY 1.0
+#include <PubSubClient.h>  // check out https://github.com/dersimn/ArduinoPubSubClientTools
+#include <ArduinoJson.h>  //https://arduinojson.org/
+#include <Wire.h>
 #include <time.h>
 #include "secrets.h"
-
-#define AWS_IOT_PUBLISH_TOPIC   "dev-robot-output"
-#define AWS_IOT_SUBSCRIBE_TOPIC "dev-robot-input"
+#include "common.h"
 
 WiFiClientSecure net;
- 
+
 BearSSL::X509List cert(cacert);
 BearSSL::X509List client_crt(client_cert);
 BearSSL::PrivateKey key(privkey);
- 
+
 PubSubClient client(net);
 
 unsigned long lastMillis = 0;
@@ -29,12 +40,23 @@ const long interval = 5000;
 
 time_t now;
 time_t nowish = 1510592825;
- 
- 
+
+
+void sendToI2C(int ilen, unsigned char *idata) {
+  assert(ilen < JSON_MAX_SIZE);
+  Wire.beginTransmission(I2C_HERCULES_ADDRESS);
+  for (int i = 0; i < ilen; i++) {
+    Wire.write(idata[i]);
+  }  // sends one byte
+  Wire.endTransmission();                              // stop transmitting
+
+}
+
+
 void NTPConnect(void)
 {
   Serial.print("Setting time using SNTP");
-  configTime(TIME_ZONE * 3600, 0 * 3600, "pool.ntp.org", "time.nist.gov");
+  configTime(TIME_ZONE * 3600, 0 * 3600, NTP_SERVERS);
   now = time(nullptr);
   while (now < nowish)
   {
@@ -48,89 +70,91 @@ void NTPConnect(void)
   Serial.print("Current time: ");
   Serial.print(asctime(&timeinfo));
 }
- 
- 
+
+
 void messageReceived(char *topic, byte *payload, unsigned int length)
 {
+  //Serial.println("his");
   Serial.print("Received [");
   Serial.print(topic);
-  Serial.print("]: ");
-  for (int i = 0; i < length; i++)
-  {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
+  Serial.println("]: ");
+  Serial.println((char*)payload);
+  sendToI2C(length, payload);
+  Serial.println("sent to I2C...");
 }
- 
- 
+
+
 void connectAWS()
 {
   delay(3000);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
- 
+
   Serial.println(String("Attempting to connect to SSID: ") + String(WIFI_SSID));
- 
+
   while (WiFi.status() != WL_CONNECTED)
   {
     Serial.print(".");
     delay(1000);
   }
- 
+
   NTPConnect();
- 
+
   net.setTrustAnchors(&cert);
   net.setClientRSACert(&client_crt, &key);
- 
+
   client.setServer(MQTT_HOST, 8883);
   client.setCallback(messageReceived);
- 
- 
+
+
   Serial.println("Connecting to AWS IOT");
- 
+
   while (!client.connect(THINGNAME))
   {
     Serial.print(".");
     delay(1000);
   }
- 
+
   if (!client.connected()) {
     Serial.println("AWS IoT Timeout!");
     return;
   }
   // Subscribe to a topic
   client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
- 
+
   Serial.println("AWS IoT Connected!");
 }
- 
- 
+
+
 void publishMessage()
 {
   StaticJsonDocument<200> doc;
   doc["time"] = millis();
   char jsonBuffer[512];
   serializeJson(doc, jsonBuffer); // print to client
- 
+
   client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
 }
- 
- 
+
+
 void setup()
 {
   Serial.begin(115200);
+  //Wire.begin(D1, D2);
+  Wire.begin(I2C_ESP8266_ADDRESS);
   connectAWS();
 }
- 
- 
+
+
 void loop()
-{ 
-  delay(2000);
- 
+{
+  //delay(2000);
+
   now = time(nullptr);
- 
+
   if (!client.connected())
   {
+    Serial.println(client.state());
     connectAWS();
   }
   else
@@ -139,38 +163,38 @@ void loop()
     if (millis() - lastMillis > 5000)
     {
       lastMillis = millis();
-      publishMessage();
+      //publishMessage();
     }
   }
 }
 
 /*
-// Replace with your network credentials
-const char* ssid     = "WiFi-1463";
-const char* password = "14678370";
+  // Replace with your network credentials
+  const char* ssid     = "WiFi-1463";
+  const char* password = "14678370";
 
-// Set web server port number to 80
-WiFiServer server(80);
+  // Set web server port number to 80
+  WiFiServer server(80);
 
-// Variable to store the HTTP request
-String header;
+  // Variable to store the HTTP request
+  String header;
 
-// Auxiliar variables to store the current output state
-String output5State = "off";
-String output4State = "off";
+  // Auxiliar variables to store the current output state
+  String output5State = "off";
+  String output4State = "off";
 
-// Assign output variables to GPIO pins
-const int output5 = 5;
-const int output4 = 4;
+  // Assign output variables to GPIO pins
+  const int output5 = 5;
+  const int output4 = 4;
 
-// Current time
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0; 
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
+  // Current time
+  unsigned long currentTime = millis();
+  // Previous time
+  unsigned long previousTime = 0;
+  // Define timeout time in milliseconds (example: 2000ms = 2s)
+  const long timeoutTime = 2000;
 
-void setup() {
+  void setup() {
   Serial.begin(115200);
   // Initialize the output variables as outputs
   pinMode(output5, OUTPUT);
@@ -193,9 +217,9 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
-}
+  }
 
-void loop(){
+  void loop(){
   WiFiClient client = server.available();   // Listen for incoming clients
 
   if (client) {                             // If a new client connects,
@@ -204,7 +228,7 @@ void loop(){
     currentTime = millis();
     previousTime = currentTime;
     while (client.connected() && currentTime - previousTime <= timeoutTime) { // loop while the client's connected
-      currentTime = millis();         
+      currentTime = millis();
       if (client.available()) {             // if there's bytes to read from the client,
         char c = client.read();             // read a byte, then
         Serial.write(c);                    // print it out the serial monitor
@@ -219,7 +243,7 @@ void loop(){
             client.println("Content-type:text/html");
             client.println("Connection: close");
             client.println();
-            
+
             // turns the GPIOs on and off
             if (header.indexOf("GET /5/on") >= 0) {
               Serial.println("GPIO 5 on");
@@ -238,40 +262,40 @@ void loop(){
               output4State = "off";
               digitalWrite(output4, LOW);
             }
-            
+
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons 
+            // CSS to style the on/off buttons
             // Feel free to change the background-color and font-size attributes to fit your preferences
             client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
             client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
             client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
             client.println(".button2 {background-color: #77878A;}</style></head>");
-            
+
             // Web Page Heading
             client.println("<body><h1>ESP8266 Web Server</h1>");
-            
-            // Display current state, and ON/OFF buttons for GPIO 5  
+
+            // Display current state, and ON/OFF buttons for GPIO 5
             client.println("<p>GPIO 5 - State " + output5State + "</p>");
-            // If the output5State is off, it displays the ON button       
+            // If the output5State is off, it displays the ON button
             if (output5State=="off") {
               client.println("<p><a href=\"/5/on\"><button class=\"button\">ON</button></a></p>");
             } else {
               client.println("<p><a href=\"/5/off\"><button class=\"button button2\">OFF</button></a></p>");
-            } 
-               
-            // Display current state, and ON/OFF buttons for GPIO 4  
+            }
+
+            // Display current state, and ON/OFF buttons for GPIO 4
             client.println("<p>GPIO 4 - State " + output4State + "</p>");
-            // If the output4State is off, it displays the ON button       
+            // If the output4State is off, it displays the ON button
             if (output4State=="off") {
               client.println("<p><a href=\"/4/on\"><button class=\"button\">ON</button></a></p>");
             } else {
               client.println("<p><a href=\"/4/off\"><button class=\"button button2\">OFF</button></a></p>");
             }
             client.println("</body></html>");
-            
+
             // The HTTP response ends with another blank line
             client.println();
             // Break out of the while loop
@@ -291,5 +315,5 @@ void loop(){
     Serial.println("Client disconnected.");
     Serial.println("");
   }
-}
+  }
 */
