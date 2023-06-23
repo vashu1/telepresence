@@ -1,7 +1,3 @@
-/*********
-  Rui Santos
-  Complete project details at https://randomnerdtutorials.com
-*********/
 // board - NodeMCU 1.0    serial 115200
 // note to myself - use left USB port, reconnect usb on error
 // https://github.com/esp8266/Arduino/issues/1330
@@ -18,14 +14,39 @@
 #include <ESP8266WiFi.h>
 
 #include <WiFiClientSecure.h>
-// NodeMCY 1.0
+// NodeMCU 1.0
 #include <PubSubClient.h>  // check out https://github.com/dersimn/ArduinoPubSubClientTools
 #include <ArduinoJson.h>  //https://arduinojson.org/
-#include <Wire.h>
 #include <time.h>
 #include "secrets.h"
 #include "common.h"
 
+#include <ESP8266mDNS.h>
+#include <ArduinoOTA.h>
+
+#include <AccelStepper.h>
+//TODO AccelStepper::HALF4WIRE
+#define MotorInterfaceType 4
+#define MOTOR_PIN_1 14
+#define MOTOR_PIN_2 12
+#define MOTOR_PIN_3 13
+#define MOTOR_PIN_4 15
+AccelStepper phoneStepper(MotorInterfaceType, MOTOR_PIN_1, MOTOR_PIN_3, MOTOR_PIN_2, MOTOR_PIN_4);
+
+#define OTA_HOSTNAME "telerobot"
+//in secrets #define OTA_PASSWORD "" // uncomment    TODO add empty str check
+
+unsigned long lastCmdTime = 0;
+
+/*#include <AccelStepper.h>
+const int stepsPerRevolution = 2038;
+// D5-D8
+#define IN1 14
+#define IN2 12
+#define IN3 13
+#define IN4 15
+AccelStepper stepper(AccelStepper::HALF4WIRE, IN1, IN3, IN2, IN4);
+*/
 WiFiClientSecure net;
 
 BearSSL::X509List cert(cacert);
@@ -34,68 +55,82 @@ BearSSL::PrivateKey key(privkey);
 
 PubSubClient client(net);
 
-unsigned long lastMillis = 0;
-unsigned long previousMillis = 0;
-const long interval = 5000;
-
 time_t now;
 time_t nowish = 1510592825;
 
-
-void sendToI2C(int ilen, unsigned char *idata) {
-  assert(ilen < JSON_MAX_SIZE);
-  Wire.beginTransmission(I2C_HERCULES_ADDRESS);
-  for (int i = 0; i < ilen; i++) {
-    Wire.write(idata[i]);
-  }  // sends one byte
-  Wire.endTransmission();                              // stop transmitting
-
-}
-
-
-void NTPConnect(void)
-{
-  Serial.print("Setting time using SNTP");
-  configTime(TIME_ZONE * 3600, 0 * 3600, NTP_SERVERS);
-  now = time(nullptr);
-  while (now < nowish)
-  {
-    delay(500);
-    Serial.print(".");
+void NTPConnect(void) {
+    //Serial.print("Setting time using SNTP");
+    configTime(TIME_ZONE * 3600, 0 * 3600, NTP_SERVERS);
     now = time(nullptr);
-  }
-  Serial.println("done!");
-  struct tm timeinfo;
-  gmtime_r(&now, &timeinfo);
-  Serial.print("Current time: ");
-  Serial.print(asctime(&timeinfo));
+    while (now < nowish) {
+        delay(500);
+        //Serial.print(".");
+        now = time(nullptr);
+    }
+    //Serial.println("done!");
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    //Serial.print("Current time: ");
+    //Serial.print(asctime(&timeinfo));
 }
 
 
-void messageReceived(char *topic, byte *payload, unsigned int length)
-{
-  //Serial.println("his");
-  Serial.print("Received [");
-  Serial.print(topic);
-  Serial.println("]: ");
-  Serial.println((char*)payload);
-  sendToI2C(length, payload);
-  Serial.println("sent to I2C...");
+int getCmdCode(const char* cmd) {
+  if (strcmp(CMD_STR_MOVE,   cmd) == 0) return CMD_INT_MOVE;
+  if (strcmp(CMD_STR_CAMERA, cmd) == 0) return CMD_INT_CAMERA;
+  if (strcmp(CMD_STR_PING,   cmd) == 0) return CMD_INT_PING;
+  return -1;
 }
 
 
-void connectAWS()
-{
-  delay(3000);
+void iotMessageReceived(char *topic, byte *payload, unsigned int length) {
+    //Serial.println(topic);
+    //Serial.println((char*)payload);
+    
+    DynamicJsonDocument doc(JSON_MAX_SIZE);
+    deserializeJson(doc, payload);
+
+    const char* cmd = doc["cmd"];
+    int cmdCode = getCmdCode(cmd);
+    // {"cmd":"camera", "speed":200,"steps":2000,"acceleration":100}
+    if (cmdCode == CMD_INT_PING) {
+      client.publish(AWS_IOT_PUBLISH_TOPIC, "pong");
+      return;
+    };
+    if (cmdCode == CMD_INT_CAMERA) {
+      phoneStepper.setAcceleration(doc.containsKey("acceleration") ? doc["acceleration"] : 100);
+      phoneStepper.setMaxSpeed(doc.containsKey("speed") ? doc["speed"] : 100);
+      phoneStepper.setSpeed(doc.containsKey("speed") ? doc["speed"] : 100);
+      phoneStepper.moveTo(phoneStepper.currentPosition() + (int)doc["steps"]);
+      return;
+    }
+    // {"cmd": "move", "direction": "f", "levels": [10,20]}
+    Serial.write((uint8_t)SERIAL_PACKET_START);
+    String direction = doc["direction"];
+    Serial.write(direction.charAt(0));
+    JsonArray cmds = doc["levels"].as<JsonArray>();
+    Serial.write((uint8_t)cmds.size());
+    uint8_t sum = 0;
+    for (int i=0 ; i < cmds.size() ; i++) {
+      uint8_t level = cmds[i];
+      sum = sum ^ level;
+      Serial.write(level);
+    }
+    Serial.write(sum);
+    
+    lastCmdTime = millis();
+}
+
+
+void connectAWS() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  Serial.println(String("Attempting to connect to SSID: ") + String(WIFI_SSID));
+  //Serial.println(String("Attempting to connect to SSID: ") + String(WIFI_SSID));
 
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(1000);
+  while (WiFi.status() != WL_CONNECTED) {
+      //Serial.print(".");
+      delay(1000);
   }
 
   NTPConnect();
@@ -104,216 +139,90 @@ void connectAWS()
   net.setClientRSACert(&client_crt, &key);
 
   client.setServer(MQTT_HOST, 8883);
-  client.setCallback(messageReceived);
+  client.setCallback(iotMessageReceived);
 
+  //Serial.println("Connecting to AWS IOT");
 
-  Serial.println("Connecting to AWS IOT");
-
-  while (!client.connect(THINGNAME))
-  {
-    Serial.print(".");
-    delay(1000);
+  while (!client.connect(THINGNAME)) {
+      //Serial.print(".");
+      delay(1000);
   }
 
   if (!client.connected()) {
-    Serial.println("AWS IoT Timeout!");
-    return;
+      //Serial.println("AWS IoT Timeout!");
+      return;
   }
   // Subscribe to a topic
   client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
 
-  Serial.println("AWS IoT Connected!");
+  //Serial.println("AWS IoT Connected!");
+  client.publish(AWS_IOT_PUBLISH_TOPIC, "\"esp8266_connected\"");
 }
 
 
-void onRecieveI2C(int len) {
-    DynamicJsonDocument doc(JSON_MAX_SIZE);
-    deserializeJson(doc, Wire);
-    //doc["time"] = millis();
-    char jsonBuffer[JSON_MAX_SIZE];
-    serializeJson(doc, jsonBuffer);
-    client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
-}
-
-
-void setup()
-{
-  Serial.begin(115200);
-  //Wire.begin(D1, D2);
-  Wire.begin(I2C_ESP8266_ADDRESS);
-  Wire.onReceive(onRecieveI2C);
-  connectAWS();
-}
-
-
-void loop()
-{
-  //delay(2000);
-
-  now = time(nullptr);
-
-  if (!client.connected())
-  {
-    Serial.println(client.state());
+void setup() {
+    Serial.begin(SERIAL_SPEED);
+  
+  //TODO undo comment password
+    ArduinoOTA.setHostname(OTA_HOSTNAME);
+    //ArduinoOTA.setPassword((const char *)OTA_PASSWORD);
+    ArduinoOTA.begin();
+  
     connectAWS();
-  }
-  else
-  {
-    client.loop();
-    if (millis() - lastMillis > 5000)
-    {
-      lastMillis = millis();
-      //publishMessage();
-    }
-  }
+
+    //pinMode(14, INPUT); // D5
 }
 
-/*
-  // Replace with your network credentials
-  const char* ssid     = "WiFi-1463";
-  const char* password = "14678370";
+unsigned long lastPingTime = 0;
+void loop() {
+  /*
+  client.publish(AWS_IOT_PUBLISH_TOPIC, (digitalRead(14) == LOW) ? "\"LOW\"" : "\"HIGH\"");
+  delay(1500);
+  return;*/
+    if (!phoneStepper.run()) phoneStepper.disableOutputs();  // digitalWrite(15, LOW);
 
-  // Set web server port number to 80
-  WiFiServer server(80);
-
-  // Variable to store the HTTP request
-  String header;
-
-  // Auxiliar variables to store the current output state
-  String output5State = "off";
-  String output4State = "off";
-
-  // Assign output variables to GPIO pins
-  const int output5 = 5;
-  const int output4 = 4;
-
-  // Current time
-  unsigned long currentTime = millis();
-  // Previous time
-  unsigned long previousTime = 0;
-  // Define timeout time in milliseconds (example: 2000ms = 2s)
-  const long timeoutTime = 2000;
-
-  void setup() {
-  Serial.begin(115200);
-  // Initialize the output variables as outputs
-  pinMode(output5, OUTPUT);
-  pinMode(output4, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output5, LOW);
-  digitalWrite(output4, LOW);
-
-  // Connect to Wi-Fi network with SSID and password
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  // Print local IP address and start web server
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  server.begin();
-  }
-
-  void loop(){
-  WiFiClient client = server.available();   // Listen for incoming clients
-
-  if (client) {                             // If a new client connects,
-    Serial.println("New Client.");          // print a message out in the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    currentTime = millis();
-    previousTime = currentTime;
-    while (client.connected() && currentTime - previousTime <= timeoutTime) { // loop while the client's connected
-      currentTime = millis();
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        header += c;
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-
-            // turns the GPIOs on and off
-            if (header.indexOf("GET /5/on") >= 0) {
-              Serial.println("GPIO 5 on");
-              output5State = "on";
-              digitalWrite(output5, HIGH);
-            } else if (header.indexOf("GET /5/off") >= 0) {
-              Serial.println("GPIO 5 off");
-              output5State = "off";
-              digitalWrite(output5, LOW);
-            } else if (header.indexOf("GET /4/on") >= 0) {
-              Serial.println("GPIO 4 on");
-              output4State = "on";
-              digitalWrite(output4, HIGH);
-            } else if (header.indexOf("GET /4/off") >= 0) {
-              Serial.println("GPIO 4 off");
-              output4State = "off";
-              digitalWrite(output4, LOW);
-            }
-
-            // Display the HTML web page
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons
-            // Feel free to change the background-color and font-size attributes to fit your preferences
-            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #77878A;}</style></head>");
-
-            // Web Page Heading
-            client.println("<body><h1>ESP8266 Web Server</h1>");
-
-            // Display current state, and ON/OFF buttons for GPIO 5
-            client.println("<p>GPIO 5 - State " + output5State + "</p>");
-            // If the output5State is off, it displays the ON button
-            if (output5State=="off") {
-              client.println("<p><a href=\"/5/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/5/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }
-
-            // Display current state, and ON/OFF buttons for GPIO 4
-            client.println("<p>GPIO 4 - State " + output4State + "</p>");
-            // If the output4State is off, it displays the ON button
-            if (output4State=="off") {
-              client.println("<p><a href=\"/4/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/4/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }
-            client.println("</body></html>");
-
-            // The HTTP response ends with another blank line
-            client.println();
-            // Break out of the while loop
-            break;
-          } else { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
+   /* if (lastPingTime == 0 || (millis() - lastPingTime >= 10000)) {
+          lastPingTime = millis();
+          client.publish(AWS_IOT_PUBLISH_TOPIC, "\"10sec\"");
+    };*/
+    
+    if (millis() - lastCmdTime > EMERGENCY_STOP_TIMEOUT_MS) {
+        ArduinoOTA.handle();
+    };
+    //if (!stepper.isRunning()) stepper.disableOutputs();
+    //stepper.run();
+    //if (stepper.isRunning()) return;
+    
+  
+    if (Serial.available() > 0) { // reading data from Hercules
+   /*   char a[100];
+      for (int i=0;i<100;i++) a[i] = 0;
+      for (int i=0;i<99;i++){
+        int c = Serial.read();
+        if (c==-1) break;
+        a[i] = c;
       }
+      Serial.println(a);
+      client.publish(AWS_IOT_PUBLISH_TOPIC, a);*/
+
+      DynamicJsonDocument doc(JSON_MAX_SIZE);
+      JsonArray array = doc.to<JsonArray>();
+      while(Serial.available())
+        array.add((uint8_t)Serial.read());
+      char s[JSON_MAX_SIZE];
+      serializeJson(doc, s);
+      client.publish(AWS_IOT_ENCODER_TOPIC, s);
+      
+    };
+
+    //now = time(nullptr);
+  
+    if (!client.connected()) {
+        //Serial.println(client.state());
+        delay(3000);
+        connectAWS();
+        client.publish(AWS_IOT_PUBLISH_TOPIC, "loop_reconnect");
+    } else {
+        client.loop();
     }
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
-  }
-  }
-*/
+}
