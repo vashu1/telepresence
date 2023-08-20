@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script>
+        window.onload = function() {
+            setInterval(function(){
+              var x = Math.floor((Math.random() * 100) + 1);
+
+              document.getElementById("result3").setAttribute("style", "width:calc("+x+"% * 0.73)");
+              document.getElementById("result3").parentElement.setAttribute("style", "font-size:"+parseInt(window.innerWidth/5)+"px;");
+            },1000);
+        }
+    </script>
+    <style>
+.font-150px{font-size: 150px!important;}
+.font-50px{font-size: 50px!important;}
+.font-70px{font-size: 70px!important;}
+
+.fa-battery-filling{
+  position: relative;
+}
+.fa-battery-filling span{
+  position: absolute;
+  background: orange;
+  top: 28%;
+  height: 44%;
+  left: 11%;
+  border-radius: 2px;
+  transition: 250ms ease;
+}
+.fa-battery-filling [style="width:calc(1% * 0.73)"],
+.fa-battery-filling [style="width:calc(2% * 0.73)"], 
+.fa-battery-filling [style="width:calc(3% * 0.73)"], 
+.fa-battery-filling [style="width:calc(4% * 0.73)"], 
+.fa-battery-filling [style="width:calc(5% * 0.73)"], 
+.fa-battery-filling [style="width:calc(6% * 0.73)"], 
+.fa-battery-filling [style="width:calc(7% * 0.73)"], 
+.fa-battery-filling [style="width:calc(8% * 0.73)"], 
+.fa-battery-filling [style="width:calc(9% * 0.73)"], 
+.fa-battery-filling [style="width:calc(10% * 0.73)"],
+.fa-battery-filling [style="width:calc(11% * 0.73)"],
+.fa-battery-filling [style="width:calc(12% * 0.73)"],
+.fa-battery-filling [style="width:calc(13% * 0.73)"],
+.fa-battery-filling [style="width:calc(14% * 0.73)"],
+.fa-battery-filling [style="width:calc(15% * 0.73)"],
+.fa-battery-filling [style="width:calc(16% * 0.73)"],
+.fa-battery-filling [style="width:calc(17% * 0.73)"],
+.fa-battery-filling [style="width:calc(18% * 0.73)"],
+.fa-battery-filling [style="width:calc(19% * 0.73)"],
+.fa-battery-filling [style="width:calc(20% * 0.73)"]{
+  background: red;
+}
+<!-- 21% to 49% colored orange -->
+.fa-battery-filling [style="width:calc(50% * 0.73)"],
+.fa-battery-filling [style="width:calc(51% * 0.73)"],
+.fa-battery-filling [style="width:calc(52% * 0.73)"],
+.fa-battery-filling [style="width:calc(53% * 0.73)"],
+.fa-battery-filling [style="width:calc(54% * 0.73)"],
+.fa-battery-filling [style="width:calc(55% * 0.73)"],
+.fa-battery-filling [style="width:calc(56% * 0.73)"],
+.fa-battery-filling [style="width:calc(57% * 0.73)"],
+.fa-battery-filling [style="width:calc(58% * 0.73)"],
+.fa-battery-filling [style="width:calc(59% * 0.73)"],
+.fa-battery-filling [style="width:calc(60% * 0.73)"],
+.fa-battery-filling [style="width:calc(61% * 0.73)"],
+.fa-battery-filling [style="width:calc(62% * 0.73)"],
+.fa-battery-filling [style="width:calc(63% * 0.73)"],
+.fa-battery-filling [style="width:calc(64% * 0.73)"],
+.fa-battery-filling [style="width:calc(65% * 0.73)"],
+.fa-battery-filling [style="width:calc(66% * 0.73)"],
+.fa-battery-filling [style="width:calc(67% * 0.73)"],
+.fa-battery-filling [style="width:calc(68% * 0.73)"],
+.fa-battery-filling [style="width:calc(69% * 0.73)"],
+.fa-battery-filling [style="width:calc(70% * 0.73)"],
+.fa-battery-filling [style="width:calc(71% * 0.73)"],
+.fa-battery-filling [style="width:calc(72% * 0.73)"],
+.fa-battery-filling [style="width:calc(73% * 0.73)"],
+.fa-battery-filling [style="width:calc(74% * 0.73)"],
+.fa-battery-filling [style="width:calc(75% * 0.73)"],
+.fa-battery-filling [style="width:calc(76% * 0.73)"],
+.fa-battery-filling [style="width:calc(77% * 0.73)"],
+.fa-battery-filling [style="width:calc(78% * 0.73)"],
+.fa-battery-filling [style="width:calc(79% * 0.73)"],
+.fa-battery-filling [style="width:calc(80% * 0.73)"],
+.fa-battery-filling [style="width:calc(81% * 0.73)"],
+.fa-battery-filling [style="width:calc(82% * 0.73)"],
+.fa-battery-filling [style="width:calc(83% * 0.73)"],
+.fa-battery-filling [style="width:calc(84% * 0.73)"],
+.fa-battery-filling [style="width:calc(85% * 0.73)"],
+.fa-battery-filling [style="width:calc(86% * 0.73)"],
+.fa-battery-filling [style="width:calc(87% * 0.73)"],
+.fa-battery-filling [style="width:calc(88% * 0.73)"],
+.fa-battery-filling [style="width:calc(89% * 0.73)"],
+.fa-battery-filling [style="width:calc(90% * 0.73)"],
+.fa-battery-filling [style="width:calc(91% * 0.73)"],
+.fa-battery-filling [style="width:calc(92% * 0.73)"],
+.fa-battery-filling [style="width:calc(93% * 0.73)"],
+.fa-battery-filling [style="width:calc(94% * 0.73)"],
+.fa-battery-filling [style="width:calc(95% * 0.73)"],
+.fa-battery-filling [style="width:calc(96% * 0.73)"],
+.fa-battery-filling [style="width:calc(97% * 0.73)"],
+.fa-battery-filling [style="width:calc(98% * 0.73)"],
+.fa-battery-filling [style="width:calc(99% * 0.73)"],
+.fa-battery-filling [style="width:calc(100% * 0.73)"]{
+  background: green;
+}
+    </style>
+  </head>
+  <body>
+    <i class="fa fa-battery-empty fa-battery-filling" style="font-size: 444%;" aria-hidden="true">
+        <span id="result3" style="width:calc(10% * 0.73)"></span>
+    </i>
+  </body>
+</html>
