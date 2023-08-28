@@ -1,3 +1,50 @@
+hercules motor driver https://github.com/Seeed-Studio/Hercules_Motor_Driver
+https://seeeddoc.github.io/Skeleton_Bot-4WD_hercules_mobile_robotic_platform/
+https://seeeddoc.github.io/Hercules_Dual_15A_6-20V_Motor_Controller/    same https://wiki.seeedstudio.com/
+https://forum.seeedstudio.com/
+
 yoannmoinet-nipplejs - joystick widget
+//https://yoannmoi.net/nipplejs/
+<script src="./nipplejs.js"></script>
+<script>
+    var manager = nipplejs.create(options);
+</script>
 
 joy.js    @author       : Roberto D'Amico (Bobboteck)
+
+
+https for mq??
+  manual https://www.clarinspect.com/assessmentninja/2021/2/15/how-to-add-amazon-ca-authority-certificates-to-your-android-device
+
+
+https for site   just cloudfront?   https://stackoverflow.com/questions/40761309/adding-ssl-to-domain-hosted-on-route-53-aws  https://letsencrypt.org/
+https://www.mischianti.org/2022/01/09/esp8266-self-ota-update-in-https-ssl-tls-with-trusted-self-signed-certificate-3/
+
+
+wifi connect to phone hotspot  https://github.com/tzapu/WiFiManager
+
+no sleep https://stackoverflow.com/questions/6106747/can-i-prevent-phone-from-sleep-on-a-webpage
+  https://github.com/richtr/NoSleep.js
+
+https://forum.arduino.cc/t/connect-esp-8266-nodemcu-to-arduino/550687/13
+I remember our ESP8266 expert PieterP suggest the voltage divider with a single resistor, taking advantage of the internal one
+
+
+Schottky diode from an input to 3.3 V ensures that the pin cannot be pulled significantly above 
+    https://forum.arduino.cc/t/serial-communication-between-3-3v-board-and-5v-board/691611/3
+...
+1n4148   4 pF  1n4148.pdf
+UF4007  10 pf   https://html.alldatasheet.net/html-pdf/34149/WTE/UF4007/45/1/UF4007.html
+
+=====
+
+I2C
+
+https://microdigisoft.com/esp8266-nodemcu-i2c-communication/
+Typical values for 5V devices are 4.7k Ohm and 2.4k Ohm for 3.3V devices.
+
+https://forum.arduino.cc/t/i2c-communication-between-nodemcu-and-arduino-uno/534715/6
+1500 ohm to 3.3
+
+https://forum.arduino.cc/t/i2c-bus-with-3-3v-and-5-0v-device/113914/4
+I hooked up 4.7k resistors between I2C lines and +3.3 volts and it works great.

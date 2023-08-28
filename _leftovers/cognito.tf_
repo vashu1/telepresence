@@ -1,3 +1,14 @@
+/*
+git clone https://github.com/aws-amplify/amplify-js.git
+Download the amazon-cognito-identity-js package from npm and get amazon-cognito-identity.min.js file from the dist folder. Place it in your project.
+
+ Amazon Cognito Identity Provider examples https://docs.amazonaws.cn/en_us/sdk-for-javascript/v3/developer-guide/javascript_cognito-identity-provider_code_examples.html
+
+ cognito http https://andrewtarry.com/posts/aws-http-gateway-with-cognito-and-terraform/
+iot cognito https://stackoverflow.com/questions/40301345/connect-to-aws-iot-using-web-socket-with-cognito-authenticated-users
+certeficate iot terraform https://advancedweb.hu/how-to-manage-iot-core-resources-with-terraform/
+*/
+
 resource "aws_cognito_user_pool" "pool" {
   name = "${var.env_name}-pool"
 
